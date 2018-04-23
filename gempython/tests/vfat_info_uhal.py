@@ -145,9 +145,6 @@ chipids = getAllChipIDs(ohboard, options.gtx, chipmask,options.debug)
 msg = chipids
 gemlogger.debug(msg)
 
-msg = chipids
-gemlogger.debug(msg)
-
 if options.biasAll:
     biasAllVFATs(ohboard, options.gtx, chipmask)
     pass
@@ -200,3 +197,17 @@ print
 print "--=======================================--"
 print
 
+print "--===== Last BX Latency Counter =========--"
+print
+counts = []
+# writeAllVFATs(ohboard, options.gtx, "VThreshold1", 100)
+for i in range(24):
+    baseNode = "GEM_AMC.OH.OH%d.COUNTERS"%(options.gtx)
+    writeRegister(ohboard,"%s.VFAT%d_LAT_BX.RESET"%(baseNode,i),0x1)
+    # time.sleep(0.1*(test+1))
+for i in range(24):
+    baseNode = "GEM_AMC.OH.OH%d.COUNTERS"%(options.gtx)
+    counts.append(readRegister(ohboard,"%s.VFAT%d_LAT_BX"%(baseNode,i)))
+    # print ('  '.join(map(str,map(lambda vfat: (vfat, "%d"%counts[vfat]), range(0,24)))))
+for i in range(24):
+    print "VFAT%02d  %d"%(i,counts[i])

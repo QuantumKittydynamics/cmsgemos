@@ -32,7 +32,7 @@ setOHLogLevel(logging.INFO)
 if options.debug:
     setOHLogLevel(logging.DEBUG)
 
-SAMPLE_TIME = 1.
+SAMPLE_TIME = 0.25
 
 print
 print "-> --------------------------"
@@ -42,10 +42,10 @@ print "-> --------------------------"
 fwver   = getFirmwareVersion(ohboard,options.gtx)
 date    = getFirmwareDateString(ohboard,options.gtx)
 print "-> OH FW %10s  %10s"%("Version","Date")
-print "  ->     %s%10s%s  %s%10s%s"%(colors.YELLOW,date,colors.ENDC,
-                                     colors.YELLOW,fwver,colors.ENDC)
+print "         %s%10s%s  %s%10s%s"%(colors.YELLOW,fwver,colors.ENDC,
+                                     colors.YELLOW,date,colors.ENDC)
 print
-#printSysmonInfo(ohboard,options.gtx)
+printSysmonInfo(ohboard,options.gtx)
 print
 print "Connected VFATs mask: 0x%08x"%(getConnectedVFATsMask(ohboard,options.gtx,options.debug))
 # print "VFATs s-bit mask:     0x%08x"%(getVFATsBitMask(ohboard,options.gtx,options.debug))

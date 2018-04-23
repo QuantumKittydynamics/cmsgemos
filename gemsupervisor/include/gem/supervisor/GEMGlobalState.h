@@ -143,6 +143,10 @@ namespace gem {
 
 	std::string getStateName() const { return m_globalStateName; };
 
+	std::string getStateMessage() const { return m_globalStateMessage; };
+
+        void setGlobalStateMessage(std::string const& stateMessage) { m_globalStateMessage = stateMessage; };
+
         static int getStatePriority(toolbox::fsm::State state);
 
         /**
@@ -176,7 +180,7 @@ namespace gem {
          * @brief updates the global state based on the individual states of the managed applications
          */
         void calculateGlobals();
-        
+
         toolbox::fsm::State getProperCompositeState(toolbox::fsm::State const& initial,
                                                     toolbox::fsm::State const& final,
                                                     std::string         const& states);

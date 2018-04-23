@@ -58,9 +58,9 @@ namespace gem {
          * as the IP address and address table can be managed there, rather than hard coded
          * Constrution from crateID and slotID uses this constructor as the back end
          */
-        HwGenericAMC();
-        HwGenericAMC(std::string const& amcDevice);
-        HwGenericAMC(std::string const& amcDevice, int const& crate, int const& slot);
+        /* HwGenericAMC(); */
+        /* HwGenericAMC(std::string const& amcDevice); */
+        /* HwGenericAMC(std::string const& amcDevice, int const& crate, int const& slot); */
         HwGenericAMC(std::string const& amcDevice, std::string const& connectionFile);
         HwGenericAMC(std::string const& amcDevice, std::string const& connectionURI,
                      std::string const& addressTable);
@@ -175,9 +175,11 @@ namespace gem {
          * Reset the gtx status registers
          * @param uint8_t gtx is the number of the gtx to query
          * @param uint8_t resets control which bits to reset
-         * bit 1 - TRK_ErrCnt         0x1
-         * bit 2 - TRG_ErrCnt         0x2
-         * bit 3 - Data_Rec           0x4
+         * bit 1 - GTX_TRK_ErrCnt         0x1
+         * bit 2 - GTX_TRG_ErrCnt         0x2
+         * bit 3 - GTX_Data_Rec           0x4
+         * bit 4 - GBT_TRK_ErrCnt         0x8
+         * bit 5 - GBT_Data_Rec           0x10
          * @throws gem::hw::exception::InvalidLink if the gtx number is outside of 0-N_GTX
          */
         virtual void LinkReset(uint8_t const& gtx, uint8_t const& resets);
@@ -343,7 +345,7 @@ namespace gem {
         // * get the tracking data, have to do this intelligently, as IPBus transactions are expensive
         // * and need to pack all events together
         // * @param uint8_t gtx is the number of the GTX tracking data to read
-        // * @param size_t nBlocks is the number of VFAT data blocks (7*32bit words) to read
+        // * @param sizeo_t nBlocks is the number of VFAT data blocks (7*32bit words) to read
         // * @retval std::vector<uint32_t> returns the 7*nBlocks data words in the buffer
         // */
         //std::vector<uint32_t> getTrackingData(uint8_t const& gtx, size_t const& nBlocks=1);
@@ -375,10 +377,27 @@ namespace gem {
         virtual void disableDAQLink();
 
         /**
-         * @brief reset the DAQ link and write the DAV timout
-         * @param davTO value to use for the DAV timeout
+         * @brief Set the zero suppression mode
+         * @param enable true means any VFAT data packet with all 0's will be suppressed
          */
-        virtual void resetDAQLink(uint32_t const& davTO=0x3d090);
+        virtual void enableZeroSuppression(bool enable=true);
+
+        /**
+         * @brief Disable zero suppression of VFAT data
+         */
+        virtual void disableZeroSuppression();
+
+        /**
+         * @brief reset the DAQ link and write the DAV timout
+         *        - assert RESET and then release
+         *        - disable DAQ link
+         *        - set each link EOE_TIMEOUT to default value
+         *        - set DAV_TIMEOUT  to supplied value
+         *        - set TTS_OVERRIDE to supplied value
+         * @param davTO value to use for the DAV timeout
+         * @param ttsOverride value to use for the TTS override
+         */
+        virtual void resetDAQLink(uint32_t const& davTO=0x500, uint32_t const& ttsOverride=0x0);
 
         /**
          * @returns Returns the 32 bit word corresponding to the DAQ link control register
@@ -518,8 +537,9 @@ namespace gem {
          * @brief Set DAQ link timeout
          * @param value is the number of clock cycles to wait after receipt of last L1A and
          *        last packet received from the optical link before closing an "event"
+         *        (in units of 160MHz clock cycles, value/4 for 40MHz clock cycles)
          */
-        virtual void setDAQLinkInputTimeout(uint32_t const& value);
+        virtual void setDAQLinkInputTimeout(uint32_t const& value=0x100);
 
         /**
          * @brief Special run type to be written into data stream
@@ -615,6 +635,17 @@ namespace gem {
          * @returns 32-bit word corresponding to the 8 most recent TTC commands received
          */
         virtual uint32_t getTTCSpyBuffer();
+
+        /**************************/
+        /** CLOW_CONTROL module information **/
+        /**************************/
+
+        /*** SCA submodule ***/
+        /**
+         * @brief Enable the SCA to forward HardReset to the OptoHybrid
+         * @param bool switches on/off the HardReset forwarding (default is false)
+         */
+        virtual void scaHardResetEnable(bool const& en=false);
 
         /********************************/
         /** TRIGGER module information **/

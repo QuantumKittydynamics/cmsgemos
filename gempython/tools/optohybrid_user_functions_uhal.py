@@ -171,7 +171,9 @@ def broadcastRead(device,gtx,register,mask=0xff000000,debug=False):
         time.sleep(0.1)
         pass
 
-    return readBlock(device,"%s.Results"%(baseNode),24)
+    # bitcount = bits not set in mask
+    bitcount = 24
+    return readBlock(device,"%s.Results"%(baseNode),bitcount)
 
 def optohybridCounters(device,gtx=0,doReset=False,debug=False):
     """
@@ -294,13 +296,13 @@ def setTriggerThrottle(device,gtx,throttle):
     """
     Set the trigger throttle
     """
-    return writeRegister(device,"GEM_AMC.OH.OH%d.CONTROL.THROTTLE"%(gtx),throttle)
+    return writeRegister(device,"GEM_AMC.OH.OH%d.CONTROL.TRIGGER.THROTTLE"%(gtx),throttle)
 
 def getTriggerThrottle(device,gtx):
     """
     Get the trigger throttling value
     """
-    return readRegister(device,"GEM_AMC.OH.OH%d.CONTROL.THROTTLE"%(gtx))
+    return readRegister(device,"GEM_AMC.OH.OH%d.CONTROL.TRIGGER.THROTTLE"%(gtx))
 
 def configureLocalT1(device, gtx, mode, t1type, delay, interval, number, debug=False):
     """
@@ -465,9 +467,10 @@ def setReferenceClock(device,gtx,source,debug=False):
     V2A:   0=onboard, 1=GTX recovered,  2=external clock
     V2B:   0=GBT,     1=CCB HDMI
 
-    (Currently disabled for stability reasons)
+    (Documentation above suspect, current OH FW has GBT and CCB switched,
+    but as a hack)
     """
-    # writeRegister(device,"GEM_AMC.OH.OH%d.CONTROL.CLOCK.REF_CLK"%(gtx),source)
+    writeRegister(device,"GEM_AMC.OH.OH%d.CONTROL.CLOCK.REF_CLK"%(gtx),source)
     return
 
 def getReferenceClock(device,gtx,debug=False):
@@ -575,24 +578,32 @@ def configureScanModule(device, gtx, mode, vfat, channel=0,
     msg+= "FW scan channel    : %d\n"%(channel)
     msg+= "FW scan step size  : %d\n"%(stepsize)
     msg+= "FW scan n_triggers : %d\n"%(numtrigs)
-    ohlogger.debug(colormsg(msg,logging.DEBUG))
+    ohlogger.info(colormsg(msg,logging.DEBUG))
 
     writeRegister(device,"%s.RESET"%(scanBase),0x1)
     regList = {
-        "%s.MODE"%(scanBase):  mode,
-        "%s.MIN"%(scanBase):   scanmin,
-        "%s.MAX"%(scanBase):   scanmax,
-        "%s.CHAN"%(scanBase):  channel,
-        "%s.STEP"%(scanBase):  stepsize,
-        "%s.NTRIGS"%(scanBase):numtrigs
+        "%s.CONF.MODE"%(scanBase):  mode,
+        "%s.CONF.MIN"%(scanBase):   scanmin,
+        "%s.CONF.MAX"%(scanBase):   scanmax,
+        "%s.CONF.CHAN"%(scanBase):  channel,
+        "%s.CONF.STEP"%(scanBase):  stepsize,
+        "%s.CONF.NTRIGS"%(scanBase):numtrigs
      }
     if useUltra:
-        regList["%s.MASK"%(scanBase)] = vfat
+        regList["%s.CONF.MASK"%(scanBase)] = vfat
     else:
-        regList["%s.CHIP"%(scanBase)] = vfat
+        regList["%s.CONF.CHIP"%(scanBase)] = vfat
         pass
 
     writeRegisterList(device,regList)
+    
+    #regList = dict.fromkeys(["GEM_AMC.OH.OH%d.COUNTERS.CRC.INCORRECT.VFAT%d.Reset"%(gtx,i) for i in range(24)],1)
+    #writeRegisterList(device,regList)
+    # for some reason the code above doesn't work and triggers ipbus transaction errors... The code below works!
+    for i in range(24):
+        writeRegister(device,"GEM_AMC.OH.OH%d.COUNTERS.CRC.INCORRECT.VFAT%d.Reset"%(gtx,i), 1)
+        writeRegister(device,"GEM_AMC.OH.OH%d.COUNTERS.CRC.VALID.VFAT%d.Reset"%(gtx,i), 1)
+
     return
 
 def printScanConfiguration(device,gtx,useUltra=False,debug=False):
@@ -605,18 +616,18 @@ def printScanConfiguration(device,gtx,useUltra=False,debug=False):
 
     print scanBase
     regList = [
-        "%s.MODE"%(   scanBase),
-        "%s.MIN"%(    scanBase),
-        "%s.MAX"%(    scanBase),
-        "%s.CHAN"%(   scanBase),
-        "%s.STEP"%(   scanBase),
-        "%s.NTRIGS"%( scanBase),
-        "%s.MONITOR"%(scanBase),
+        "%s.CONF.MODE"%(  scanBase),
+        "%s.CONF.MIN"%(   scanBase),
+        "%s.CONF.MAX"%(   scanBase),
+        "%s.CONF.CHAN"%(  scanBase),
+        "%s.CONF.STEP"%(  scanBase),
+        "%s.CONF.NTRIGS"%(scanBase),
+        "%s.MONITOR"%(    scanBase),
      ]
     if useUltra:
-        regList.append("%s.MASK"%(scanBase))
+        regList.append("%s.CONF.MASK"%(scanBase))
     else:
-        regList.append("%s.CHIP"%(scanBase))
+        regList.append("%s.CONF.CHIP"%(scanBase))
         pass
 
     if debug:
@@ -634,17 +645,17 @@ def printScanConfiguration(device,gtx,useUltra=False,debug=False):
             pass
         pass
     regVals = readRegisterList(device,regList)
-    print "FW scan mode       : %d"%(regVals["%s.MODE"%(scanBase)])
-    print "FW scan min        : %d"%(regVals["%s.MIN"%(scanBase)])
-    print "FW scan max        : %d"%(regVals["%s.MAX"%(scanBase)])
+    print "FW scan mode       : %d"%(regVals["%s.CONF.MODE"%(scanBase)])
+    print "FW scan min        : %d"%(regVals["%s.CONF.MIN"%(scanBase)])
+    print "FW scan max        : %d"%(regVals["%s.CONF.MAX"%(scanBase)])
     if useUltra:
-        print "Ultra FW scan mask : 0x%08x"%(regVals["%s.MASK"%(scanBase)])
+        print "Ultra FW scan mask : 0x%08x"%(regVals["%s.CONF.MASK"%(scanBase)])
     else:
-        print "FW scan VFAT       : %d"%(regVals["%s.CHIP"%(scanBase)])
+        print "FW scan VFAT       : %d"%(regVals["%s.CONF.CHIP"%(scanBase)])
         pass
-    print "FW scan channel    : %d"%(regVals["%s.CHAN"%(scanBase)])
-    print "FW scan step size  : %d"%(regVals["%s.STEP"%(scanBase)])
-    print "FW scan n_triggers : %d"%(regVals["%s.NTRIGS"%(scanBase)])
+    print "FW scan channel    : %d"%(regVals["%s.CONF.CHAN"%(scanBase)])
+    print "FW scan step size  : %d"%(regVals["%s.CONF.STEP"%(scanBase)])
+    print "FW scan n_triggers : %d"%(regVals["%s.CONF.NTRIGS"%(scanBase)])
     print "FW scan status     : 0x%08x"%(readRegister(device,"%s.MONITOR"%(scanBase)))
 
     return
@@ -697,10 +708,24 @@ def getScanResults(device, gtx, numpoints, debug=False):
 
 def getUltraScanResults(device, gtx, numpoints, debug=False):
     scanBase = "GEM_AMC.OH.OH%d.ScanController.ULTRA"%(gtx)
+    ohnL1A_0 = getL1ACount(device,gtx)
+    ohnL1A = getL1ACount(device,gtx)
+    numtrigs = readRegister(device,"%s.CONF.NTRIGS"%(scanBase))
+    if (readRegister(device,"%s.CONF.MODE"%(scanBase))==2):
+        isLatency = True
+        print "At link %s: %d/%d L1As processed, %d%% done" %(gtx, getL1ACount(device,gtx)-ohnL1A_0, numpoints*numtrigs, (getL1ACount(device,gtx)-ohnL1A_0)*100./(numpoints*numtrigs))
+    else:
+        isLatency = False    
     while (readRegister(device,"%s.MONITOR.STATUS"%(scanBase)) > 0):
         msg = "%s: Ultra scan still running (0x%x), not returning results"%(device,
                                                                             readRegister(device,"%s.MONITOR.STATUS"%(scanBase)))
         ohlogger.debug(colormsg(msg,logging.DEBUG))
+        if (isLatency):
+            if ((getL1ACount(device,gtx)-ohnL1A) > numtrigs):
+                print "At link %s: %d/%d L1As processed, %d%% done" %(gtx, getL1ACount(device,gtx)-ohnL1A_0, numpoints*numtrigs, (getL1ACount(device,gtx)-ohnL1A_0)*100./(numpoints*numtrigs))
+                ohnL1A = getL1ACount(device,gtx)
+        else:
+            pass
         time.sleep(0.1)
         pass
 
@@ -740,24 +765,30 @@ def printSysmonInfo(device, gtx, debug=False):
     adcBase = "GEM_AMC.OH.OH%d.ADC"%(gtx)
 
     regList = ["TEMP", "VCCINT", "VCCAUX",
-               "TEMP_MAX", "VCCINT_MAX", "VCCAUX_MAX",
-               "TEMP_MIN", "VCCINT_MIN", "VCCAUX_MIN"]
+               "TEMP.MAX", "VCCINT.MAX", "VCCAUX.MAX",
+               "TEMP.MIN", "VCCINT.MIN", "VCCAUX.MIN"]
     regs = []
     for reg in regList:
         regs.append("%s.%s"%(adcBase,reg))
         pass
     res = readRegisterList(device,regs)
+
+    def TEMP_CONV(daccode):
+        return daccode*0.49-273.15
+    def VCC_CONV(daccode):
+        return daccode*2.93/1000
+
     print "OptoHybrid ADC sysmon"
-    print "        %8s  %8s  %8s"%("Temp", "VCCINT", "VCCAUX")
-    print "Current:%2.6f  %2.6f  %2.6f"%(res["%s.TEMP"%(adcBase)],
-                                         res["%s.VCCINT"%(adcBase)],
-                                         res["%s.VCCAUX"%(adcBase)])
-    print "Max:    %2.6f  %2.6f  %2.6f"%(res["%s.TEMP_MAX"%(adcBase)],
-                                         res["%s.VCCINT_MAX"%(adcBase)],
-                                         res["%s.VCCAUX_MAX"%(adcBase)])
-    print "Min:    %2.6f  %2.6f  %2.6f"%(res["%s.TEMP_MIN"%(adcBase)],
-                                         res["%s.VCCINT_MIN"%(adcBase)],
-                                         res["%s.VCCAUX_MIN"%(adcBase)])
+    print "         %7s  %8s  %8s"%("Temp", "VCCINT", "VCCAUX")
+    print "Current: %3.2f C  %1.4f V  %1.4f V"%(TEMP_CONV((res["%s.TEMP"%(adcBase)     ]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCINT"%(adcBase)    ]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCAUX"%(adcBase)    ]>>6)&0x3ff))
+    print "Max:     %3.2f C  %1.4f V  %1.4f V"%(TEMP_CONV((res["%s.TEMP.MAX"%(adcBase) ]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCINT.MAX"%(adcBase)]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCAUX.MAX"%(adcBase)]>>6)&0x3ff))
+    print "Min:     %3.2f C  %1.4f V  %1.4f V"%(TEMP_CONV((res["%s.TEMP.MIN"%(adcBase) ]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCINT.MIN"%(adcBase)]>>6)&0x3ff),
+                                                VCC_CONV((res["%s.VCCAUX.MIN"%(adcBase)]>>6)&0x3ff))
     return
 
 def calculateLinkErrors(device,gtx,sampleTime):
@@ -778,3 +809,6 @@ def calculateLinkErrors(device,gtx,sampleTime):
         second = readRegister(device,"%s.OH%d.COUNTERS.%s_LINK.TRK_ERR"%(baseNode,gtx,link))
         errorCounts[link] = [first,second]
     return errorCounts
+                                                                                      
+def getL1ACount(device,link):
+    return readRegister(device, "GEM_AMC.OH.OH%s.COUNTERS.T1.SENT.L1A"%(link))
